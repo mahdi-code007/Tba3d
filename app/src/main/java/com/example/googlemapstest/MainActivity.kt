@@ -2,6 +2,7 @@ package com.example.googlemapstest
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.location.Location
 import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
@@ -19,8 +20,13 @@ import com.google.android.gms.location.*
 import com.google.android.gms.tasks.Task
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.ktx.auth
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreException
+import com.google.firebase.firestore.QuerySnapshot
 import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.firestore.ktx.toObject
+import com.google.firebase.firestore.ktx.toObjects
 import com.google.firebase.ktx.Firebase
 
 class MainActivity : AppCompatActivity() {
@@ -37,6 +43,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var firebase: FirebaseFirestore
     private lateinit var auth: FirebaseAuth
     private lateinit var binding: ActivityMainBinding
+
+    private var myLatitude : String = "0.0"
+    private var myLongitude : String = "0.0"
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
@@ -53,8 +62,74 @@ class MainActivity : AppCompatActivity() {
         locationRequest.fastestInterval = 5000
         locationRequest.priority = LocationRequest.PRIORITY_HIGH_ACCURACY
 
+        getLocations()
     }
 
+    private fun getDistanceBetweenTwoPoints(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Float {
+        val distance = FloatArray(2)
+        Location.distanceBetween(lat1, lon1,
+                lat2, lon2, distance)
+        return distance[0]
+    }
+
+    private fun getLocations() {
+        firebase.collection("Locations")
+//                .whereNotEqualTo("Uid" , auth.currentUser?.uid)
+                .addSnapshotListener() { querySnapshot: QuerySnapshot?, firebaseFirestoreException: FirebaseFirestoreException? ->
+                    if (querySnapshot != null) {
+                        for (locations  in querySnapshot.documents) {
+
+                            val locationsLoaded = locations.toObject<Locations>()
+
+                            val distance = getDistanceBetweenTwoPoints(myLatitude.toDouble(),
+                                    myLongitude.toDouble(),
+                                    locationsLoaded?.latitude!!.toDouble(),
+                                    locationsLoaded?.longitude!!.toDouble()
+                            )
+
+                            binding.tvDistance.text = distance.toString() + " M"
+//                            if (distance <= 5.0F){
+//                                binding.tvDistance.text = distance.toString() + " M"
+//                            }
+                            Log.i(TAG, distance.toString())
+                            Log.i(TAG, "getLocations: ${locationsLoaded?.latitude.toString()}")
+                            Log.i(TAG, "getLocations: ${locationsLoaded?.longitude.toString()}")
+
+                        }
+                    }
+                }
+    }
+
+
+
+
+
+    private val locationCallback: LocationCallback = object : LocationCallback() {
+        override fun onLocationResult(p0: LocationResult) {
+            if (p0 == null) {
+                Log.i(TAG, "null")
+                return
+            }
+            for (result in p0.locations) {
+                Log.i(TAG, result.latitude.toString() + result.longitude.toString())
+
+                binding.tvLatitude.text = result.latitude.toString()
+                binding.tvLongitude.text = result.longitude.toString()
+
+                myLatitude = result.latitude.toString()
+                myLongitude = result.longitude.toString()
+
+                val location = hashMapOf(
+                        "latitude" to result.latitude.toString(),
+                        "longitude" to result.longitude.toString(),
+                        "Uid" to auth.currentUser!!.uid.toString()
+                )
+                firebase.collection("Locations")
+                        .document(auth.currentUser!!.uid)
+                        .set(location)
+            }
+        }
+    }
 
     private fun hasAccessFindLocationPermission() =
             ActivityCompat.checkSelfPermission(
@@ -64,7 +139,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun requestPermissions() {
         var permissionsToRequest = mutableListOf<String>()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (!hasAccessFindLocationPermission()) {
                 permissionsToRequest.add(Manifest.permission.ACCESS_FINE_LOCATION)
             }
@@ -130,13 +205,6 @@ class MainActivity : AppCompatActivity() {
                         Manifest.permission.ACCESS_COARSE_LOCATION
                 ) != PackageManager.PERMISSION_GRANTED
         ) {
-            // TODO: Consider calling
-            //    ActivityCompat#requestPermissions
-            // here to request the missing permissions, and then overriding
-            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-            //                                          int[] grantResults)
-            // to handle the case where the user grants the permission. See the documentation
-            // for ActivityCompat#requestPermissions for more details.
             return
         }
 
@@ -148,30 +216,6 @@ class MainActivity : AppCompatActivity() {
                 locationCallback,
                 Looper.getMainLooper()
         )
-    }
-
-
-    private val locationCallback: LocationCallback = object : LocationCallback() {
-        override fun onLocationResult(p0: LocationResult) {
-            if (p0 == null) {
-                Log.i(TAG, "null")
-                return
-            }
-            for (result in p0.locations) {
-                Log.i(TAG, result.latitude.toString() + result.longitude.toString())
-
-                binding.tvLatitude.text = result.latitude.toString()
-                binding.tvLongitude.text = result.longitude.toString()
-
-                val location = hashMapOf(
-                        "latitude" to result.latitude.toString(),
-                        "longitude" to result.longitude.toString()
-                )
-                firebase.collection("Locations")
-                        .document(auth.currentUser!!.uid)
-                        .set(location)
-            }
-        }
     }
 
     private fun signInAnonymously() {
