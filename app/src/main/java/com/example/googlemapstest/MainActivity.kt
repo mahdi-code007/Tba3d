@@ -17,6 +17,8 @@ import com.example.googlemapstest.databinding.ActivityMainBinding
 
 import com.google.android.gms.location.*
 import com.google.android.gms.tasks.Task
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.ktx.auth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
@@ -32,45 +34,27 @@ class MainActivity : AppCompatActivity() {
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var locationRequest: LocationRequest
 
-    private lateinit var firebase : FirebaseFirestore
+    private lateinit var firebase: FirebaseFirestore
+    private lateinit var auth: FirebaseAuth
+    private lateinit var binding: ActivityMainBinding
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
-        val binding: ActivityMainBinding =
-                DataBindingUtil.setContentView(this, R.layout.activity_main)
+        binding = DataBindingUtil.setContentView(this, R.layout.activity_main)
 
         firebase = FirebaseFirestore.getInstance()
+        auth = Firebase.auth
+        signInAnonymously()
+
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
 
         locationRequest = LocationRequest.create()
-        locationRequest.interval = 4000
-        locationRequest.fastestInterval = 2000
+        locationRequest.interval = 10000
+        locationRequest.fastestInterval = 5000
         locationRequest.priority = LocationRequest.PRIORITY_HIGH_ACCURACY
-//        binding.lifecycleOwner = this
-//        navController = findNavController(R.id.NavHostFragment)
-
-//        firebase.collection("qqq")
-//                .document("test")
-//                .set()
-
-        // Create a new user with a first and last name
-        val user = hashMapOf(
-                "first" to "Ada",
-                "last" to "Lovelace",
-                "born" to 1815
-        )
-
-// Add a new document with a generated ID
-        firebase.collection("users")
-                .add(user)
-                .addOnSuccessListener { documentReference ->
-                    Log.d(TAG, "DocumentSnapshot added with ID: ${documentReference.id}")
-                }
-                .addOnFailureListener { e ->
-                    Log.w(TAG, "Error adding document", e)
-                }
 
     }
+
 
     private fun hasAccessFindLocationPermission() =
             ActivityCompat.checkSelfPermission(
@@ -109,25 +93,10 @@ class MainActivity : AppCompatActivity() {
                 }
 
             }
-//            getLastLocation()
             checkSettingsAndStartLocationUpdates()
         }
     }
 
-    override fun onStop() {
-        super.onStop()
-        stopLocationUpdate()
-    }
-
-    override fun onStart() {
-        super.onStart()
-        if (hasAccessFindLocationPermission()) {
-            Toast.makeText(this, "Permission Granted.", Toast.LENGTH_SHORT).show()
-            checkSettingsAndStartLocationUpdates()
-        } else {
-            requestPermissions()
-        }
-    }
 
     private fun checkSettingsAndStartLocationUpdates() {
 
@@ -181,26 +150,56 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    private fun stopLocationUpdate() {
-        fusedLocationClient.removeLocationUpdates(locationCallback)
-    }
 
     private val locationCallback: LocationCallback = object : LocationCallback() {
         override fun onLocationResult(p0: LocationResult) {
-            Log.i(TAG, "call back")
             if (p0 == null) {
                 Log.i(TAG, "null")
                 return
             }
             for (result in p0.locations) {
-//                Log.i(TAG, result.toString())
-
                 Log.i(TAG, result.latitude.toString() + result.longitude.toString())
 
+                binding.tvLatitude.text = result.latitude.toString()
+                binding.tvLongitude.text = result.longitude.toString()
+
+                val location = hashMapOf(
+                        "latitude" to result.latitude.toString(),
+                        "longitude" to result.longitude.toString()
+                )
                 firebase.collection("Locations")
-                        .document("test")
-                        .set(result)
+                        .document(auth.currentUser!!.uid)
+                        .set(location)
             }
+        }
+    }
+
+    private fun signInAnonymously() {
+        auth.signInAnonymously().addOnSuccessListener {
+            Toast.makeText(this, "User Created", Toast.LENGTH_LONG).show()
+            Log.i(TAG, "User Created")
+        }.addOnFailureListener {
+            Toast.makeText(this, it.localizedMessage, Toast.LENGTH_LONG).show()
+            Log.i(TAG, "User Created")
+        }
+    }
+
+    private fun stopLocationUpdate() {
+        fusedLocationClient.removeLocationUpdates(locationCallback)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        stopLocationUpdate()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (hasAccessFindLocationPermission()) {
+            Toast.makeText(this, "Permission Granted.", Toast.LENGTH_SHORT).show()
+            checkSettingsAndStartLocationUpdates()
+        } else {
+            requestPermissions()
         }
     }
 
