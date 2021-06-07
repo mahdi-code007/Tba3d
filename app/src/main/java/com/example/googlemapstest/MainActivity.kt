@@ -1,9 +1,12 @@
 package com.example.googlemapstest
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
+import android.media.RingtoneManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Looper
@@ -34,7 +37,6 @@ class MainActivity : AppCompatActivity() {
         const val TAG = "LocationTest"
     }
 
-    private lateinit var navController: NavController
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var locationRequest: LocationRequest
 
@@ -42,8 +44,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var auth: FirebaseAuth
     private lateinit var binding: ActivityMainBinding
 
-    private var myLatitude : String = "0.0"
-    private var myLongitude : String = "0.0"
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
@@ -54,90 +54,24 @@ class MainActivity : AppCompatActivity() {
         signInAnonymously()
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
-
         locationRequest = LocationRequest.create()
         locationRequest.interval = 10000
         locationRequest.fastestInterval = 5000
         locationRequest.priority = LocationRequest.PRIORITY_HIGH_ACCURACY
 
-        getLocations()
-
+//        getLocations()
 
         val serviceIntent = Intent(this, ForegroundLocationServices::class.java)
         ContextCompat.startForegroundService(this, serviceIntent)
+
     }
 
-    private fun getDistanceBetweenTwoPoints(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Float {
-        val distance = FloatArray(2)
-        Location.distanceBetween(lat1, lon1,
-                lat2, lon2, distance)
-        return distance[0]
-    }
-
-    private fun getLocations() {
-        firebase.collection("Locations")
-//                .whereNotEqualTo("Uid" , auth.currentUser?.uid)
-                .addSnapshotListener() { querySnapshot: QuerySnapshot?, firebaseFirestoreException: FirebaseFirestoreException? ->
-                    if (querySnapshot != null) {
-                        for (locations  in querySnapshot.documents) {
-
-                            val locationsLoaded = locations.toObject<Locations>()
-
-                            val distance = getDistanceBetweenTwoPoints(myLatitude.toDouble(),
-                                    myLongitude.toDouble(),
-                                    locationsLoaded?.latitude!!.toDouble(),
-                                    locationsLoaded?.longitude!!.toDouble()
-                            )
-
-                            binding.tvDistance.text = distance.toString() + " M"
-//                            if (distance <= 5.0F){
-//                                binding.tvDistance.text = distance.toString() + " M"
-//                            }
-                            Log.i(TAG, distance.toString())
-                            Log.i(TAG, "getLocations: ${locationsLoaded?.latitude.toString()}")
-                            Log.i(TAG, "getLocations: ${locationsLoaded?.longitude.toString()}")
-
-                        }
-                    }
-                }
-    }
-
-
-
-
-
-    private val locationCallback: LocationCallback = object : LocationCallback() {
-        override fun onLocationResult(p0: LocationResult) {
-            if (p0 == null) {
-                Log.i(TAG, "null")
-                return
-            }
-            for (result in p0.locations) {
-                Log.i(TAG, result.latitude.toString() + result.longitude.toString())
-
-                binding.tvLatitude.text = result.latitude.toString()
-                binding.tvLongitude.text = result.longitude.toString()
-
-                myLatitude = result.latitude.toString()
-                myLongitude = result.longitude.toString()
-
-                val location = hashMapOf(
-                        "latitude" to result.latitude.toString(),
-                        "longitude" to result.longitude.toString(),
-                        "Uid" to auth.currentUser!!.uid.toString()
-                )
-                firebase.collection("Locations")
-                        .document(auth.currentUser!!.uid)
-                        .set(location)
-            }
-        }
-    }
 
     private fun hasAccessFindLocationPermission() =
-            ActivityCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.ACCESS_FINE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED
+        ActivityCompat.checkSelfPermission(
+            this,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
 
     private fun requestPermissions() {
         var permissionsToRequest = mutableListOf<String>()
@@ -148,18 +82,18 @@ class MainActivity : AppCompatActivity() {
         }
         if (permissionsToRequest.isNotEmpty()) {
             ActivityCompat.requestPermissions(
-                    this,
-                    permissionsToRequest.toTypedArray(),
-                    LOCATION_RC
+                this,
+                permissionsToRequest.toTypedArray(),
+                LOCATION_RC
             )
         }
     }
 
 
     override fun onRequestPermissionsResult(
-            requestCode: Int,
-            permissions: Array<out String>,
-            grantResults: IntArray
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
 
@@ -180,45 +114,24 @@ class MainActivity : AppCompatActivity() {
         Toast.makeText(this, "checkSettingsAndStartLocationUpdates", Toast.LENGTH_LONG).show()
 
         val locationSettingsRequest = LocationSettingsRequest.Builder()
-                .addLocationRequest(locationRequest)
-                .build()
+            .addLocationRequest(locationRequest)
+            .build()
 
         val settingsClient: SettingsClient = LocationServices.getSettingsClient(this)
 
         val locationSettingsResponseTask: Task<LocationSettingsResponse> =
-                settingsClient.checkLocationSettings(locationSettingsRequest)
+            settingsClient.checkLocationSettings(locationSettingsRequest)
 
         locationSettingsResponseTask.addOnSuccessListener {
             Toast.makeText(this, "startLocationUpdate", Toast.LENGTH_LONG).show()
             Log.i(BlankFragment.TAG, "startLocationUpdate")
-            startLocationUpdate()
+//            startLocationUpdate()
         }.addOnFailureListener {
             Toast.makeText(this, it.message.toString(), Toast.LENGTH_LONG).show()
             Log.i(BlankFragment.TAG, it.message.toString())
         }
     }
 
-    private fun startLocationUpdate() {
-        if (ActivityCompat.checkSelfPermission(
-                        this,
-                        Manifest.permission.ACCESS_FINE_LOCATION
-                ) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
-                        this,
-                        Manifest.permission.ACCESS_COARSE_LOCATION
-                ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            return
-        }
-
-        Log.i(TAG, "startLocationUpdate 2")
-        Toast.makeText(this, "startLocationUpdate 2", Toast.LENGTH_LONG).show()
-
-        fusedLocationClient.requestLocationUpdates(
-                locationRequest,
-                locationCallback,
-                Looper.getMainLooper()
-        )
-    }
 
     private fun signInAnonymously() {
         auth.signInAnonymously().addOnSuccessListener {
@@ -230,14 +143,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun stopLocationUpdate() {
-        fusedLocationClient.removeLocationUpdates(locationCallback)
-    }
-
-    override fun onStop() {
-        super.onStop()
-        stopLocationUpdate()
-    }
 
     override fun onStart() {
         super.onStart()
@@ -249,4 +154,131 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        Log.i(TAG, "onDestroy: MainActivity")
+
+        firebase.collection("Locations")
+            .document(auth.currentUser!!.uid)
+            .delete().addOnSuccessListener {
+                Log.i(TAG, "onDestroy: delete()")
+            }
+    }
+
 }
+
+//private fun getDistanceBetweenTwoPoints(
+//    lat1: Double,
+//    lon1: Double,
+//    lat2: Double,
+//    lon2: Double
+//): Float {
+//    val distance = FloatArray(2)
+//    Location.distanceBetween(lat1, lon1, lat2, lon2, distance)
+//    return distance[0]
+//}
+
+//    private fun getLocations() {
+//        firebase.collection("Locations")
+//            .addSnapshotListener() { querySnapshot: QuerySnapshot?, firebaseFirestoreException: FirebaseFirestoreException? ->
+//                if (querySnapshot != null) {
+//                    for (locations in querySnapshot.documents) {
+//
+//                        val locationsLoaded = locations.toObject<Locations>()
+//
+//                        if ( !(locationsLoaded?.Uid.equals(auth.currentUser?.uid))) {
+//
+//                            Log.i(TAG, "auth ${auth.currentUser?.uid}")
+//
+//                            val distance = getDistanceBetweenTwoPoints(
+//                                myLatitude.toDouble(),
+//                                myLongitude.toDouble(),
+//                                locationsLoaded?.latitude!!.toDouble(),
+//                                locationsLoaded.longitude!!.toDouble()
+//                            )
+//                            if (distance <= 3){
+//                                binding.tvDistance.text = distance.toString() + " M"
+//                                val notification: Uri =
+//                                    RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+//                                val r = RingtoneManager.getRingtone(
+//                                    applicationContext,
+//                                    notification
+//                                )
+//                                r.play()
+//                                // Vibrate for 500 milliseconds
+//                                // Vibrate for 500 milliseconds
+////                                ContextCompat.getSystemService(this, Context.VIBRATOR_SERVICE).vibrate(500)
+//                            }
+//
+//                            Log.i(TAG, distance.toString())
+//                            Log.i(TAG, "getLocations: ${locationsLoaded?.latitude.toString()}")
+//                            Log.i(TAG, "getLocations: ${locationsLoaded?.longitude.toString()}")
+//                        }
+//
+////                            if (distance <= 5.0F){
+////                                binding.tvDistance.text = distance.toString() + " M"
+////                            }
+//                    }
+//                }
+//            }
+//    }
+
+
+//    private val locationCallback: LocationCallback = object : LocationCallback() {
+//        override fun onLocationResult(p0: LocationResult) {
+//            if (p0 == null) {
+//                Log.i(TAG, "null")
+//                return
+//            }
+//            for (result in p0.locations) {
+//                Log.i(TAG, result.latitude.toString() + result.longitude.toString())
+//
+//                binding.tvLatitude.text = result.latitude.toString()
+//                binding.tvLongitude.text = result.longitude.toString()
+//
+//                myLatitude = result.latitude.toString()
+//                myLongitude = result.longitude.toString()
+//
+//                val location = hashMapOf(
+//                    "latitude" to result.latitude.toString(),
+//                    "longitude" to result.longitude.toString(),
+//                    "Uid" to auth.currentUser!!.uid.toString()
+//                )
+////                firebase.collection("Locations")
+////                        .document(auth.currentUser!!.uid)
+////                        .set(location)
+//            }
+//        }
+//    }
+
+
+//    private fun stopLocationUpdate() {
+//        fusedLocationClient.removeLocationUpdates(locationCallback)
+//    }
+
+//    override fun onStop() {
+//        super.onStop()
+//        stopLocationUpdate()
+//    }
+
+//    private fun startLocationUpdate() {
+//        if (ActivityCompat.checkSelfPermission(
+//                this,
+//                Manifest.permission.ACCESS_FINE_LOCATION
+//            ) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
+//                this,
+//                Manifest.permission.ACCESS_COARSE_LOCATION
+//            ) != PackageManager.PERMISSION_GRANTED
+//        ) {
+//            return
+//        }
+//
+//        Log.i(TAG, "startLocationUpdate 2")
+//        Toast.makeText(this, "startLocationUpdate 2", Toast.LENGTH_LONG).show()
+//
+//        fusedLocationClient.requestLocationUpdates(
+//            locationRequest,
+//            locationCallback,
+//            Looper.getMainLooper()
+//        )
+//    }
