@@ -39,7 +39,7 @@ class ForegroundLocationServices : Service() {
     private var myLongitude: String = "0.0"
     private lateinit var notificationBuilder: NotificationCompat.Builder
     private lateinit var manager: NotificationManager
-
+    private var listOfDistance = arrayListOf<Float>()
 
     override fun onCreate() {
         super.onCreate()
@@ -89,21 +89,24 @@ class ForegroundLocationServices : Service() {
                                 locationsLoaded?.latitude!!.toDouble(),
                                 locationsLoaded.longitude!!.toDouble()
                             )
-                            var arr = listOf(distance)
+                            listOfDistance.add(distance)
 
+                            Log.i(TAG, "listOfDistance : ${listOfDistance.size} ")
+                            if (getMinDistance() <= 20.0) {
+                                var min = getMinDistance()
+                                notificationBuilder.setContentText(
+                                    "${String.format("%.2f", min)} متر"
+                                )
+                                manager.notify(1, notificationBuilder.build())
+                                val notification: Uri =
+                                    RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                                val r = RingtoneManager.getRingtone(
+                                    applicationContext,
+                                    notification
+                                )
+                                r.play()
+                            }
 
-                            Log.i(TAG, "test: ${arr.first()} ")
-                            notificationBuilder.setContentText(
-                                "${String.format("%.2f", distance)} متر"
-                            )
-                            manager.notify(1, notificationBuilder.build())
-                            val notification: Uri =
-                                RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-                            val r = RingtoneManager.getRingtone(
-                                applicationContext,
-                                notification
-                            )
-                            r.play()
                             // Vibrate for 500 milliseconds
                             // Vibrate for 500 milliseconds
                             //                                ContextCompat.getSystemService(this, Context.VIBRATOR_SERVICE).vibrate(500)
@@ -118,6 +121,16 @@ class ForegroundLocationServices : Service() {
                     }
                 }
             }
+    }
+
+    private fun getMinDistance(): Float {
+        var min = listOfDistance[0]
+        for (i in 0 until listOfDistance.size) {
+            if (listOfDistance[i] < min) {
+                min = listOfDistance[i]
+            }
+        }
+        return min
     }
 
     override fun onStartCommand(intent: Intent, flags: Int, startId: Int): Int {
