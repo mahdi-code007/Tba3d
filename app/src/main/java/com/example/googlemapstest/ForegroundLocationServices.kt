@@ -215,7 +215,6 @@ class ForegroundLocationServices : Service() {
 //            }
         super.onDestroy()
 
-
     }
 
     @Nullable
